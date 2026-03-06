@@ -1,0 +1,25 @@
+# Windows
+Thumbs.db
+Desktop.ini
+
+# Editors
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Node / logs
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Generated exports
+*.md.download
+*.chat-export.md
+exports/
+
+# OS / temp
+*.tmp
+*.temp
+*.bak
