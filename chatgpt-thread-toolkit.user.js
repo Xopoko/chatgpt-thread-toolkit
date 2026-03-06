@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         ChatGPT Thread Toolkit
-// @namespace    https://openai.com/codex
+// @namespace    chatgpt-thread-toolkit
 // @version      0.2.0
 // @description  Keeps long ChatGPT threads responsive with compacting tools and full Markdown export.
 // @match        https://chatgpt.com/*

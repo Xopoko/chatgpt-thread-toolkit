@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.2.1 - 2026-03-06
+
+- Replaced the userscript namespace with a project-specific identifier.
+- Added an MIT license for public distribution.
+- Added a license section to the README.
+
 ## 0.2.0 - 2026-03-06
 
 - Added a lightweight floating action button with an upward action menu.

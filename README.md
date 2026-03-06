@@ -48,6 +48,10 @@ This repository includes a minimal GitHub Actions workflow that validates the us
 node --check chatgpt-thread-toolkit.user.js
 ```
 
+## License
+
+Released under the MIT License. See [`LICENSE`](./LICENSE).
+
 ## Roadmap
 
 - Improve Markdown fidelity for math-heavy threads.
