@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.4.1 - 2026-03-08
+
+- Replaced the floating action button `+` icon with a layers-style glyph that better matches thread actions.
+- Restyled the floating action menu and trigger button to better match the native ChatGPT interface.
+- Updated the screenshot asset to reflect the real in-script appearance of the menu.
+
 ## 0.4.0 - 2026-03-08
 
 - Added a per-chat `Auto-collapse here` toggle stored locally by chat URL path.

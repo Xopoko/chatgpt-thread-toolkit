@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ChatGPT Thread Toolkit
 // @namespace    chatgpt-thread-toolkit
-// @version      0.4.0
+// @version      0.4.1
 // @description  Keeps long ChatGPT threads responsive with per-chat auto-collapse plus Markdown and JSONL export.
 // @match        https://chatgpt.com/*
 // @match        https://chat.openai.com/*
@@ -51,6 +51,9 @@
         right: 28px;
         bottom: 16px;
         z-index: 2147483647;
+        color: rgba(255, 255, 255, 0.93);
+        font-family: inherit;
+        letter-spacing: -0.01em;
       }
 
       #${PANEL_ID}[data-hidden="1"] {
@@ -68,7 +71,7 @@
       #${PANEL_ID}[data-open="1"] [data-codex-trigger] {
         opacity: 1;
         transform: translateY(-1px);
-        background: rgba(15, 23, 42, 0.58);
+        background: rgba(41, 41, 44, 0.96);
       }
 
       #${PANEL_ID} [data-codex-trigger] {
@@ -77,39 +80,40 @@
         justify-content: center;
         width: 46px;
         height: 46px;
-        border: 1px solid rgba(255, 255, 255, 0.16);
+        border: 1px solid rgba(255, 255, 255, 0.08);
         border-radius: 999px;
         padding: 0;
-        background: rgba(15, 23, 42, 0.34);
-        color: #f8fafc;
+        background: rgba(33, 33, 36, 0.9);
+        color: rgba(255, 255, 255, 0.92);
         cursor: pointer;
-        box-shadow: 0 12px 30px rgba(0, 0, 0, 0.18);
-        backdrop-filter: blur(10px);
-        opacity: 0.64;
-        transition: opacity 140ms ease, transform 140ms ease, background-color 140ms ease;
+        box-shadow: 0 14px 36px rgba(0, 0, 0, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+        backdrop-filter: blur(18px);
+        opacity: 0.9;
+        transition: opacity 140ms ease, transform 140ms ease, background-color 140ms ease, border-color 140ms ease;
       }
 
       #${PANEL_ID} [data-codex-trigger]:hover,
       #${PANEL_ID} [data-codex-trigger]:focus-visible {
         opacity: 1;
         transform: translateY(-1px);
-        background: rgba(15, 23, 42, 0.56);
+        background: rgba(45, 45, 48, 0.96);
+        border-color: rgba(255, 255, 255, 0.12);
         outline: none;
       }
 
       #${PANEL_ID} [data-codex-trigger][data-state="busy"] {
         opacity: 1;
-        background: rgba(30, 64, 175, 0.62);
+        background: rgba(16, 92, 176, 0.92);
       }
 
       #${PANEL_ID} [data-codex-trigger][data-state="done"] {
         opacity: 1;
-        background: rgba(22, 101, 52, 0.56);
+        background: rgba(12, 122, 83, 0.9);
       }
 
       #${PANEL_ID} [data-codex-trigger][data-state="error"] {
         opacity: 1;
-        background: rgba(153, 27, 27, 0.62);
+        background: rgba(153, 32, 39, 0.92);
       }
 
       #${PANEL_ID} svg {
@@ -124,13 +128,13 @@
         bottom: 56px;
         display: grid;
         gap: 8px;
-        min-width: 232px;
+        min-width: 248px;
         padding: 8px;
-        border: 1px solid rgba(255, 255, 255, 0.12);
-        border-radius: 18px;
-        background: rgba(15, 23, 42, 0.84);
-        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.26);
-        backdrop-filter: blur(14px);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        border-radius: 24px;
+        background: rgba(41, 41, 44, 0.82);
+        box-shadow: 0 24px 56px rgba(7, 10, 19, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.03);
+        backdrop-filter: blur(22px) saturate(0.9);
         opacity: 0;
         pointer-events: none;
         transform: translateY(8px) scale(0.98);
@@ -143,34 +147,42 @@
         align-items: center;
         gap: 10px;
         width: 100%;
-        min-height: 46px;
-        border: 0;
-        border-radius: 14px;
-        padding: 10px 12px;
-        background: rgba(255, 255, 255, 0.06);
-        color: #f8fafc;
+        min-height: 54px;
+        border: 1px solid rgba(255, 255, 255, 0.035);
+        border-radius: 18px;
+        padding: 13px 14px;
+        background: rgba(44, 44, 47, 0.9);
+        color: rgba(255, 255, 255, 0.93);
         cursor: pointer;
         text-align: left;
-        transition: background-color 120ms ease, transform 120ms ease;
+        font: inherit;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.015);
+        transition: background-color 120ms ease, transform 120ms ease, border-color 120ms ease;
       }
 
       #${PANEL_ID} [data-codex-menu-item]:hover,
       #${PANEL_ID} [data-codex-menu-item]:focus-visible {
-        background: rgba(255, 255, 255, 0.12);
+        background: rgba(51, 51, 54, 0.96);
+        border-color: rgba(255, 255, 255, 0.06);
         transform: translateY(-1px);
         outline: none;
       }
 
       #${PANEL_ID} [data-codex-menu-item] strong {
         display: block;
-        margin-bottom: 2px;
-        font: 600 13px/1.2 ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        margin-bottom: 4px;
+        font-size: 14px;
+        font-weight: 600;
+        line-height: 1.18;
+        letter-spacing: -0.02em;
       }
 
       #${PANEL_ID} [data-codex-menu-item] span {
         display: block;
-        opacity: 0.7;
-        font: 12px/1.25 ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        color: rgba(255, 255, 255, 0.62);
+        font-size: 13px;
+        line-height: 1.28;
+        letter-spacing: -0.01em;
       }
 
       article[data-codex-compacted="1"] {
@@ -179,11 +191,11 @@
       }
 
       article[data-codex-compacted="1"] [data-codex-summary] {
-        border: 1px solid rgba(148, 163, 184, 0.25);
-        border-radius: 16px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 18px;
         padding: 14px;
         margin: 8px 0;
-        background: rgba(15, 23, 42, 0.12);
+        background: rgba(255, 255, 255, 0.03);
         color: inherit;
       }
 
@@ -214,8 +226,8 @@
         border: 0;
         border-radius: 999px;
         padding: 6px 10px;
-        background: #111827;
-        color: #f9fafb;
+        background: rgba(33, 33, 36, 0.94);
+        color: rgba(255, 255, 255, 0.93);
         cursor: pointer;
         font: inherit;
       }
@@ -416,7 +428,11 @@
     triggerButton.setAttribute('aria-haspopup', 'menu');
     triggerButton.setAttribute('aria-expanded', 'false');
     triggerButton.title = 'Thread actions';
-    triggerButton.innerHTML = createIcon(['M12 5v14', 'M5 12h14']);
+    triggerButton.innerHTML = createIcon([
+      'M12 4 4.5 8 12 12 19.5 8 12 4',
+      'M6.5 11.5 12 14.5 17.5 11.5',
+      'M6.5 15 12 18 17.5 15',
+    ]);
     triggerButton.addEventListener('click', (event) => {
       event.stopPropagation();
       toggleMenu();
