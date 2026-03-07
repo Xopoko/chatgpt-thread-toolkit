@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.4.0 - 2026-03-08
+
+- Added a per-chat `Auto-collapse here` toggle stored locally by chat URL path.
+- Added automatic compaction for chats where auto-collapse is enabled.
+- Updated documentation to describe the per-chat auto-collapse behavior.
+
+## 0.3.0 - 2026-03-08
+
+- Added `Download .jsonl` to export one JSON object per line with only `role` and `text`.
+- Split export handling into dedicated Markdown and JSONL actions.
+- Updated project copy to reflect dual export formats.
+
 ## 0.2.1 - 2026-03-06
 
 - Replaced the userscript namespace with a project-specific identifier.

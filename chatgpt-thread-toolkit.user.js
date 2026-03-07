@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         ChatGPT Thread Toolkit
 // @namespace    chatgpt-thread-toolkit
-// @version      0.2.0
-// @description  Keeps long ChatGPT threads responsive with compacting tools and full Markdown export.
+// @version      0.4.0
+// @description  Keeps long ChatGPT threads responsive with per-chat auto-collapse plus Markdown and JSONL export.
 // @match        https://chatgpt.com/*
 // @match        https://chat.openai.com/*
 // @run-at       document-idle
@@ -19,13 +19,17 @@
     panelDebounceMs: 250,
   };
 
+  const AUTO_COMPACT_STORAGE_KEY = 'chatgpt-thread-toolkit:auto-collapse-paths';
   const PANEL_ID = 'chatgpt-thread-toolkit-panel';
   const STYLE_ID = 'chatgpt-thread-toolkit-style';
   const articleState = new WeakMap();
 
+  let autoCollapseActionButton;
   let panel;
   let triggerButton;
   let menu;
+  let lastAutoCompactSignature = '';
+  let lastKnownChatKey = location.pathname;
   let panelRefreshTimer = 0;
   let triggerStateTimer = 0;
 
@@ -255,9 +259,101 @@
     return button;
   }
 
+  function updateActionButton(button, { label, description, title }) {
+    if (!button) {
+      return;
+    }
+
+    const labelNode = button.querySelector('strong');
+    const descriptionNode = button.querySelector('span');
+    if (labelNode) {
+      labelNode.textContent = label;
+    }
+    if (descriptionNode) {
+      descriptionNode.textContent = description;
+    }
+    button.title = title;
+  }
+
+  function getCurrentChatKey() {
+    return location.pathname;
+  }
+
+  function loadAutoCollapseChatKeys() {
+    try {
+      const raw = localStorage.getItem(AUTO_COMPACT_STORAGE_KEY);
+      if (!raw) {
+        return new Set();
+      }
+
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        return new Set(parsed.filter((item) => typeof item === 'string' && item));
+      }
+    } catch (error) {
+      console.error('[Thread Toolkit] Failed to read auto-collapse settings.', error);
+    }
+
+    return new Set();
+  }
+
+  function saveAutoCollapseChatKeys(chatKeys) {
+    try {
+      localStorage.setItem(AUTO_COMPACT_STORAGE_KEY, JSON.stringify(Array.from(chatKeys).sort()));
+    } catch (error) {
+      console.error('[Thread Toolkit] Failed to store auto-collapse settings.', error);
+    }
+  }
+
+  function isAutoCollapseEnabledForChat(chatKey = getCurrentChatKey()) {
+    return loadAutoCollapseChatKeys().has(chatKey);
+  }
+
+  function setAutoCollapseEnabledForChat(enabled, chatKey = getCurrentChatKey()) {
+    if (!chatKey) {
+      return enabled;
+    }
+
+    const chatKeys = loadAutoCollapseChatKeys();
+    if (enabled) {
+      chatKeys.add(chatKey);
+    } else {
+      chatKeys.delete(chatKey);
+    }
+
+    saveAutoCollapseChatKeys(chatKeys);
+    return enabled;
+  }
+
+  function updateAutoCollapseAction() {
+    const enabled = isAutoCollapseEnabledForChat();
+    updateActionButton(autoCollapseActionButton, {
+      label: enabled ? 'Auto-collapse here: on' : 'Auto-collapse here: off',
+      description: enabled
+        ? 'Enabled only for this chat URL'
+        : 'Enable automatic compaction only for this chat',
+      title: enabled
+        ? 'Disable automatic compaction for this chat'
+        : 'Enable automatic compaction for this chat',
+    });
+  }
+
+  function syncRouteState() {
+    const currentChatKey = getCurrentChatKey();
+    if (currentChatKey === lastKnownChatKey) {
+      return false;
+    }
+
+    lastKnownChatKey = currentChatKey;
+    lastAutoCompactSignature = '';
+    closeMenu();
+    return true;
+  }
+
   function ensurePanel() {
     if (panel?.isConnected) {
       updatePanelVisibility();
+      updateAutoCollapseAction();
       return;
     }
 
@@ -281,17 +377,37 @@
       },
     });
 
+    autoCollapseActionButton = createActionButton({
+      label: 'Auto-collapse here: off',
+      description: 'Enable automatic compaction only for this chat',
+      title: 'Enable automatic compaction for this chat',
+      iconPaths: ['M12 6a6 6 0 1 0 0 12a6 6 0 1 0 0-12', 'M12 12h.01'],
+      onClick: () => {
+        handleAutoCollapseToggleAction();
+      },
+    });
+
     const exportAction = createActionButton({
       label: 'Download .md',
       description: 'Export the whole chat to Markdown',
       title: 'Download the whole chat as Markdown',
       iconPaths: ['M12 3v12', 'M8 11l4 4 4-4', 'M5 19h14'],
       onClick: () => {
-        void handleExportAction();
+        void handleMarkdownExportAction();
       },
     });
 
-    menu.append(compactAction, exportAction);
+    const exportJsonlAction = createActionButton({
+      label: 'Download .jsonl',
+      description: 'Export only role and text per message',
+      title: 'Download the whole chat as JSONL',
+      iconPaths: ['M4 7h16', 'M7 12h10', 'M10 17h4'],
+      onClick: () => {
+        void handleJsonlExportAction();
+      },
+    });
+
+    menu.append(compactAction, autoCollapseActionButton, exportAction, exportJsonlAction);
 
     triggerButton = document.createElement('button');
     triggerButton.type = 'button';
@@ -309,6 +425,7 @@
     panel.append(menu, triggerButton);
     document.body.appendChild(panel);
     updatePanelVisibility();
+    updateAutoCollapseAction();
   }
 
   function updatePanelVisibility() {
@@ -379,7 +496,9 @@
   function schedulePanelRefresh() {
     window.clearTimeout(panelRefreshTimer);
     panelRefreshTimer = window.setTimeout(() => {
+      syncRouteState();
       ensurePanel();
+      maybeAutoCompactCurrentChat();
     }, SETTINGS.panelDebounceMs);
   }
 
@@ -412,6 +531,18 @@
     return role[0].toUpperCase() + role.slice(1);
   }
 
+  function normalizeJsonlRole(role) {
+    if (!role) {
+      return 'message';
+    }
+
+    if (role === 'user' || role === 'assistant') {
+      return role;
+    }
+
+    return role.toLowerCase();
+  }
+
   function getTextPreview(article, maxLength = 180) {
     const text = (article.textContent || '').replace(/\s+/g, ' ').trim();
     if (text.length <= maxLength) {
@@ -423,8 +554,14 @@
 
   function getArticleRole(article) {
     const authorNode = article.querySelector('[data-message-author-role]');
-    const storedRole = articleState.get(article)?.role;
+    const storedRole = articleState.get(article)?.rawRole;
     return normalizeRole(authorNode?.getAttribute('data-message-author-role') || storedRole);
+  }
+
+  function getArticleRawRole(article) {
+    const authorNode = article.querySelector('[data-message-author-role]');
+    const storedRole = articleState.get(article)?.rawRole;
+    return normalizeJsonlRole(authorNode?.getAttribute('data-message-author-role') || storedRole);
   }
 
   function buildSummary(article, stats) {
@@ -479,7 +616,7 @@
     const summary = buildSummary(article, stats);
     article.replaceChildren(summary);
     article.dataset.codexCompacted = '1';
-    articleState.set(article, { role: getArticleRole(article), savedNodes, stats });
+    articleState.set(article, { rawRole: getArticleRawRole(article), savedNodes, stats });
     return true;
   }
 
@@ -495,12 +632,17 @@
     return true;
   }
 
+  function createAutoCompactSignature(articles = getArticles()) {
+    return `${getCurrentChatKey()}::${articles.length}`;
+  }
+
   function compactOlderArticles() {
     const articles = getArticles();
     if (!articles.length) {
-      return;
+      return 0;
     }
 
+    let compactedCount = 0;
     for (let index = 0; index < articles.length; index += 1) {
       const article = articles[index];
       const isRecent = index >= articles.length - SETTINGS.keepLast;
@@ -509,12 +651,53 @@
       }
 
       const stats = getArticleStats(article);
-      if (stats.nodeCount < SETTINGS.minNodesForManualCompact && stats.textLength < SETTINGS.minTextForManualCompact) {
+      const minNodes = SETTINGS.minNodesForManualCompact;
+      const minText = SETTINGS.minTextForManualCompact;
+
+      if (stats.nodeCount < minNodes && stats.textLength < minText) {
         continue;
       }
 
-      compactArticle(article, stats);
+      if (compactArticle(article, stats)) {
+        compactedCount += 1;
+      }
     }
+
+    return compactedCount;
+  }
+
+  function maybeAutoCompactCurrentChat({ force = false } = {}) {
+    if (!isAutoCollapseEnabledForChat()) {
+      return 0;
+    }
+
+    const articles = getArticles();
+    if (!articles.length) {
+      return 0;
+    }
+
+    const signature = createAutoCompactSignature(articles);
+    if (!force) {
+      if (signature === lastAutoCompactSignature) {
+        return 0;
+      }
+    }
+
+    const compactedCount = compactOlderArticles();
+    lastAutoCompactSignature = signature;
+    return compactedCount;
+  }
+
+  function handleAutoCollapseToggleAction() {
+    closeMenu();
+    const enabled = setAutoCollapseEnabledForChat(!isAutoCollapseEnabledForChat());
+    updateAutoCollapseAction();
+
+    if (enabled) {
+      maybeAutoCompactCurrentChat({ force: true });
+    }
+
+    flashTriggerState('done', 850);
   }
 
   function getArticleSourceNodes(article) {
@@ -841,6 +1024,58 @@
     return cleanupMarkdown(visit(node));
   }
 
+  function extractPlainMessageText(node) {
+    const blockTags = new Set([
+      'article', 'aside', 'blockquote', 'br', 'div', 'dl', 'dt', 'dd', 'figcaption', 'figure',
+      'footer', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'header', 'hr', 'li', 'main', 'ol', 'p',
+      'pre', 'section', 'table', 'tbody', 'thead', 'tr', 'td', 'th', 'ul',
+    ]);
+
+    function visit(current) {
+      if (current.nodeType === Node.TEXT_NODE) {
+        return current.textContent || '';
+      }
+
+      if (current.nodeType !== Node.ELEMENT_NODE) {
+        return '';
+      }
+
+      const element = current;
+      const tag = element.tagName.toLowerCase();
+
+      if (['script', 'style', 'noscript', 'svg', 'path', 'button', 'input', 'textarea', 'select', 'option', 'nav', 'form'].includes(tag)) {
+        return '';
+      }
+
+      if (element.matches('.sr-only, [class*="sr-only"]')) {
+        return '';
+      }
+
+      if (tag === 'br' || tag === 'hr') {
+        return '\n';
+      }
+
+      if (tag === 'pre') {
+        const source = element.querySelector('code') || element;
+        const text = (source.textContent || '').replace(/\u00a0/g, ' ').replace(/\n+$/, '');
+        return text ? `\n${text}\n` : '';
+      }
+
+      if (tag === 'a') {
+        return Array.from(element.childNodes).map(visit).join('') || element.textContent || '';
+      }
+
+      const content = Array.from(element.childNodes).map(visit).join('');
+      if (!content) {
+        return '';
+      }
+
+      return blockTags.has(tag) ? `\n${content}\n` : content;
+    }
+
+    return cleanupMarkdown(visit(node));
+  }
+
   function extractSnapshotContent(snapshot) {
     const roots = getTopLevelExportRoots(snapshot);
     const blocks = roots.map((root) => {
@@ -860,6 +1095,25 @@
     return '';
   }
 
+  function extractSnapshotText(snapshot) {
+    const roots = getTopLevelExportRoots(snapshot);
+    const blocks = roots.map((root) => {
+      const clone = root.cloneNode(true);
+      sanitizeExportRoot(clone);
+      const text = extractPlainMessageText(clone);
+      if (text) {
+        return text;
+      }
+      return cleanInlineText(clone.textContent || '');
+    }).filter(Boolean);
+
+    if (blocks.length) {
+      return cleanupMarkdown(blocks.join('\n\n'));
+    }
+
+    return '';
+  }
+
   function getConversationTitle() {
     const title = document.title
       .replace(/\s*-\s*ChatGPT.*$/i, '')
@@ -869,18 +1123,18 @@
     return title || 'ChatGPT Chat Export';
   }
 
-  function buildFilename() {
+  function buildFilename(extension = 'md') {
     const base = getConversationTitle()
       .replace(/[<>:"/\\|?*\u0000-\u001f]/g, '')
       .replace(/[. ]+$/g, '')
       .trim();
     const safeBase = base || 'ChatGPT Chat Export';
     const timestamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
-    return `${safeBase} ${timestamp}.md`;
+    return `${safeBase} ${timestamp}.${extension}`;
   }
 
-  function triggerDownload(filename, text) {
-    const blob = new Blob([text], { type: 'text/markdown;charset=utf-8' });
+  function triggerDownload(filename, text, mimeType = 'text/plain;charset=utf-8') {
+    const blob = new Blob([text], { type: mimeType });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
@@ -919,12 +1173,31 @@
     });
 
     const markdown = cleanupMarkdown(lines.join('\n')) + '\n';
-    const filename = buildFilename();
-    triggerDownload(filename, markdown);
+    const filename = buildFilename('md');
+    triggerDownload(filename, markdown, 'text/markdown;charset=utf-8');
     return filename;
   }
 
-  async function handleExportAction() {
+  function exportConversationAsJsonl() {
+    const articles = getArticles();
+    if (!articles.length) {
+      throw new Error('No conversation messages found.');
+    }
+
+    const jsonl = articles.map((article) => {
+      const snapshot = createArticleSnapshot(article);
+      const snapshotRole = snapshot.querySelector('[data-message-author-role]')?.getAttribute('data-message-author-role');
+      const role = snapshotRole ? normalizeJsonlRole(snapshotRole) : getArticleRawRole(article);
+      const text = extractSnapshotText(snapshot) || '';
+      return JSON.stringify({ role, text });
+    }).join('\n') + '\n';
+
+    const filename = buildFilename('jsonl');
+    triggerDownload(filename, jsonl, 'application/x-ndjson;charset=utf-8');
+    return filename;
+  }
+
+  async function handleMarkdownExportAction() {
     closeMenu();
     flashTriggerState('busy', 0);
 
@@ -935,6 +1208,21 @@
       flashTriggerState('done', 1200);
     } catch (error) {
       console.error('[Thread Toolkit] Markdown export failed.', error);
+      flashTriggerState('error', 1600);
+    }
+  }
+
+  async function handleJsonlExportAction() {
+    closeMenu();
+    flashTriggerState('busy', 0);
+
+    await new Promise((resolve) => window.setTimeout(resolve, 0));
+
+    try {
+      exportConversationAsJsonl();
+      flashTriggerState('done', 1200);
+    } catch (error) {
+      console.error('[Thread Toolkit] JSONL export failed.', error);
       flashTriggerState('error', 1600);
     }
   }
