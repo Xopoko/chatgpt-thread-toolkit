@@ -7,7 +7,7 @@ on:
   pull_request:
 
 jobs:
-  userscript:
+  validate:
     runs-on: ubuntu-latest
 
     steps:
@@ -21,3 +21,15 @@ jobs:
 
       - name: Validate userscript syntax
         run: node --check chatgpt-thread-toolkit.user.js
+
+      - name: Validate extension content script syntax
+        run: node --check extension/content.js
+
+      - name: Validate popup script syntax
+        run: node --check extension/popup.js
+
+      - name: Validate manifest JSON
+        run: node -e "JSON.parse(require('fs').readFileSync('extension/manifest.json', 'utf8'));"
+
+      - name: Package extension zip
+        run: pwsh -File scripts/package-extension.ps1 -OutputPath output/chatgpt-thread-toolkit-extension.zip

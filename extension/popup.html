@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ChatGPT Thread Toolkit</title>
+    <link rel="stylesheet" href="popup.css">
+  </head>
+  <body>
+    <main class="popup-shell">
+      <div class="brand-row">
+        <div class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 4 4.5 8 12 12 19.5 8 12 4"></path>
+            <path d="M6.5 11.5 12 14.5 17.5 11.5"></path>
+            <path d="M6.5 15 12 18 17.5 15"></path>
+          </svg>
+        </div>
+        <div>
+          <div class="eyebrow">Chrome Extension</div>
+          <h1>ChatGPT Thread Toolkit</h1>
+        </div>
+      </div>
+
+      <section class="status-card">
+        <div class="status-row">
+          <span class="status-pill" id="status-pill">Checking tab</span>
+        </div>
+        <h2 id="status-heading">Loading current tab status</h2>
+        <p id="status-description">
+          The popup is checking whether the current tab is a supported ChatGPT conversation.
+        </p>
+        <button class="primary-action" id="primary-action" type="button" hidden>Open ChatGPT</button>
+      </section>
+
+      <section class="info-card">
+        <h3>What the floating menu does</h3>
+        <ul class="feature-list">
+          <li>Compact older heavy turns while keeping recent context visible</li>
+          <li>Enable per-chat auto-collapse stored locally in the extension</li>
+          <li>Download the current conversation as Markdown or JSONL</li>
+        </ul>
+      </section>
+
+      <p class="footnote">All processing stays local in your browser. No chat data is uploaded anywhere.</p>
+    </main>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

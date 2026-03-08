@@ -1,6 +1,8 @@
 # ChatGPT Thread Toolkit
 
-ChatGPT Thread Toolkit is a focused userscript for keeping long `chatgpt.com` conversations usable. It adds a small floating action button with quick thread actions that reduce UI lag and let you export the full conversation as Markdown or JSONL.
+ChatGPT Thread Toolkit is a Chrome extension for keeping long `chatgpt.com` conversations responsive. It adds a compact floating action button inside the thread so you can collapse heavy older turns and export the active conversation without leaving the page.
+
+The original userscript is still included in this repository as a legacy/reference artifact, but the extension is now the primary install path.
 
 ## Features
 
@@ -9,51 +11,86 @@ ChatGPT Thread Toolkit is a focused userscript for keeping long `chatgpt.com` co
 - Export the entire current conversation to a `.md` file.
 - Export the entire current conversation to a `.jsonl` file with only `role` and `text` per message.
 - Preserve export access even after older messages were compacted.
-- Keep the interface lightweight with a small bottom-right action menu.
+- Keep the interface lightweight with a small bottom-right action menu and a minimal toolbar popup.
 
-## Installation
+## Install The Chrome Extension
 
-1. Install [Tampermonkey](https://www.tampermonkey.net/) in your browser.
-2. Open [`chatgpt-thread-toolkit.user.js`](./chatgpt-thread-toolkit.user.js) from this repository.
-3. Create a new Tampermonkey script and paste the file contents, or use Tampermonkey's install flow from the raw file view in GitHub.
-4. Save the script and reload `https://chatgpt.com`.
+### Load unpacked
+
+1. Open Chrome and go to `chrome://extensions`.
+2. Enable `Developer mode`.
+3. Click `Load unpacked`.
+4. Select the [`extension`](./extension) folder from this repository.
+5. Open `https://chatgpt.com` and use the floating action button inside a conversation.
+
+### Package for distribution
+
+Run the packaging script from the repository root:
+
+```powershell
+pwsh -File scripts/package-extension.ps1
+```
+
+The script creates a Chrome Web Store upload zip in `output/` with the extension payload at the zip root.
+
+## Toolbar Popup
+
+The extension action opens a minimal popup that:
+
+- confirms whether the current tab is a supported ChatGPT conversation,
+- summarizes the available thread actions,
+- links unsupported tabs back to `chatgpt.com`.
+
+The actual controls stay in the floating in-page menu.
 
 ## Usage
 
-The script injects a floating action button in the bottom-right corner of the ChatGPT thread view.
+The floating action button appears in the bottom-right corner of supported ChatGPT conversation views.
 
 - `Compact Older`: collapses older large messages and keeps the latest turns expanded.
-- `Auto-collapse here`: stores the current chat URL in local settings and automatically compacts older messages only in that chat.
+- `Auto-collapse here`: stores the current chat URL path in extension storage and automatically compacts older messages only in that chat.
 - `Download .md`: exports the current conversation from first message to last message as Markdown.
 - `Download .jsonl`: exports one JSON object per line with only `role` and `text`.
 - `Expand`: appears inside each collapsed message so you can restore it in place.
 
-## Screenshot
+## Screenshots
+
+In-page action menu:
 
 ![Thread Toolkit menu](./docs/thread-toolkit-menu.png)
 
+Toolbar popup:
+
+![Thread Toolkit popup](./docs/thread-toolkit-popup.png)
+
 ## Privacy
 
-- All processing happens in the page context inside your browser.
-- The script does not send conversation data to any external service.
-- Per-chat auto-collapse preferences are stored locally in your browser via `localStorage`.
-- The Markdown export is generated locally and downloaded directly by the browser.
+- All processing happens locally in the browser.
+- The extension does not send conversation data to any external service.
+- Per-chat auto-collapse preferences are stored in `chrome.storage.local`.
+- Markdown and JSONL exports are generated locally and downloaded directly by the browser.
 
-## Limitations
+The full privacy statement for store submission is in [`docs/extension-privacy.md`](./docs/extension-privacy.md).
 
-- ChatGPT changes its DOM structure regularly, so selectors may need updates over time.
-- Markdown export is best-effort for rich content such as formulas, tables, and complex embedded UI blocks.
-- JSONL export is intentionally narrow and only stores `role` and extracted message text.
-- Auto-collapse is keyed to the chat URL path, so copied or regenerated chats are treated as separate threads.
-- The script currently targets `chatgpt.com` and `chat.openai.com` conversation pages only.
+## Legacy Userscript
+
+The previous userscript remains available at [`chatgpt-thread-toolkit.user.js`](./chatgpt-thread-toolkit.user.js) for users who still prefer Tampermonkey or a source-only install. It now includes a runtime guard so it does not try to run alongside the extension on the same page.
+
+## Store Submission Notes
+
+Chrome Web Store listing copy, permission justifications, and screenshot references live in [`docs/chrome-web-store.md`](./docs/chrome-web-store.md).
 
 ## Validation
 
-This repository includes a minimal GitHub Actions workflow that validates the userscript syntax with:
+This repository validates:
 
 ```bash
 node --check chatgpt-thread-toolkit.user.js
+node --check extension/content.js
+node --check extension/popup.js
 ```
+
+and packages the extension zip in CI using [`scripts/package-extension.ps1`](./scripts/package-extension.ps1).
 
 ## License
 

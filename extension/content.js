@@ -1,19 +1,9 @@
-// ==UserScript==
-// @name         ChatGPT Thread Toolkit
-// @namespace    chatgpt-thread-toolkit
-// @version      0.5.0
-// @description  Keeps long ChatGPT threads responsive with per-chat auto-collapse plus Markdown and JSONL export.
-// @match        https://chatgpt.com/*
-// @match        https://chat.openai.com/*
-// @run-at       document-idle
-// @grant        none
-// ==/UserScript==
-
+/* ChatGPT Thread Toolkit content script */
 (function () {
   'use strict';
 
   const GLOBAL_RUNTIME_KEY = '__chatgptThreadToolkitRuntime';
-  const RUNTIME_NAME = 'userscript';
+  const RUNTIME_NAME = 'chrome-extension';
 
   if (window[GLOBAL_RUNTIME_KEY]) {
     console.warn(`[Thread Toolkit] Skipping ${RUNTIME_NAME} runtime because ${window[GLOBAL_RUNTIME_KEY]} is already active.`);
@@ -38,10 +28,13 @@
   let panel;
   let triggerButton;
   let menu;
+  let autoCollapseChatKeys = new Set();
   let lastAutoCompactSignature = '';
   let lastKnownChatKey = location.pathname;
   let panelRefreshTimer = 0;
   let triggerStateTimer = 0;
+  let storageReadyPromise = null;
+  let storageSyncListenerInstalled = false;
 
   function injectStyles() {
     if (document.getElementById(STYLE_ID)) {
@@ -301,49 +294,81 @@
     return location.pathname;
   }
 
-  function loadAutoCollapseChatKeys() {
-    try {
-      const raw = localStorage.getItem(AUTO_COMPACT_STORAGE_KEY);
-      if (!raw) {
-        return new Set();
-      }
-
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
-        return new Set(parsed.filter((item) => typeof item === 'string' && item));
-      }
-    } catch (error) {
-      console.error('[Thread Toolkit] Failed to read auto-collapse settings.', error);
+  function normalizeAutoCollapseChatKeys(rawValue) {
+    if (!Array.isArray(rawValue)) {
+      return new Set();
     }
 
-    return new Set();
+    return new Set(rawValue.filter((item) => typeof item === 'string' && item));
   }
 
-  function saveAutoCollapseChatKeys(chatKeys) {
+  function readExtensionStorage(key) {
+    return new Promise((resolve, reject) => {
+      chrome.storage.local.get([key], (items) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+          return;
+        }
+
+        resolve(items[key]);
+      });
+    });
+  }
+
+  function writeExtensionStorage(key, value) {
+    return new Promise((resolve, reject) => {
+      chrome.storage.local.set({ [key]: value }, () => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+          return;
+        }
+
+        resolve();
+      });
+    });
+  }
+
+  async function initializeAutoCollapseStorage() {
+    if (storageReadyPromise) {
+      return storageReadyPromise;
+    }
+
+    storageReadyPromise = readExtensionStorage(AUTO_COMPACT_STORAGE_KEY)
+      .then((rawValue) => {
+        autoCollapseChatKeys = normalizeAutoCollapseChatKeys(rawValue);
+      })
+      .catch((error) => {
+        console.error('[Thread Toolkit] Failed to read auto-collapse settings.', error);
+        autoCollapseChatKeys = new Set();
+      });
+
+    return storageReadyPromise;
+  }
+
+  async function persistAutoCollapseChatKeys() {
     try {
-      localStorage.setItem(AUTO_COMPACT_STORAGE_KEY, JSON.stringify(Array.from(chatKeys).sort()));
+      await writeExtensionStorage(AUTO_COMPACT_STORAGE_KEY, Array.from(autoCollapseChatKeys).sort());
     } catch (error) {
       console.error('[Thread Toolkit] Failed to store auto-collapse settings.', error);
     }
   }
 
   function isAutoCollapseEnabledForChat(chatKey = getCurrentChatKey()) {
-    return loadAutoCollapseChatKeys().has(chatKey);
+    return autoCollapseChatKeys.has(chatKey);
   }
 
-  function setAutoCollapseEnabledForChat(enabled, chatKey = getCurrentChatKey()) {
+  async function setAutoCollapseEnabledForChat(enabled, chatKey = getCurrentChatKey()) {
     if (!chatKey) {
       return enabled;
     }
 
-    const chatKeys = loadAutoCollapseChatKeys();
     if (enabled) {
-      chatKeys.add(chatKey);
+      autoCollapseChatKeys.add(chatKey);
     } else {
-      chatKeys.delete(chatKey);
+      autoCollapseChatKeys.delete(chatKey);
     }
 
-    saveAutoCollapseChatKeys(chatKeys);
+    await persistAutoCollapseChatKeys();
     return enabled;
   }
 
@@ -405,7 +430,7 @@
       title: 'Enable automatic compaction for this chat',
       iconPaths: ['M12 6a6 6 0 1 0 0 12a6 6 0 1 0 0-12', 'M12 12h.01'],
       onClick: () => {
-        handleAutoCollapseToggleAction();
+        void handleAutoCollapseToggleAction();
       },
     });
 
@@ -714,9 +739,9 @@
     return compactedCount;
   }
 
-  function handleAutoCollapseToggleAction() {
+  async function handleAutoCollapseToggleAction() {
     closeMenu();
-    const enabled = setAutoCollapseEnabledForChat(!isAutoCollapseEnabledForChat());
+    const enabled = await setAutoCollapseEnabledForChat(!isAutoCollapseEnabledForChat());
     updateAutoCollapseAction();
 
     if (enabled) {
@@ -724,6 +749,24 @@
     }
 
     flashTriggerState('done', 850);
+  }
+
+  function installStorageSyncListener() {
+    if (storageSyncListenerInstalled) {
+      return;
+    }
+
+    storageSyncListenerInstalled = true;
+    chrome.storage.onChanged.addListener((changes, areaName) => {
+      if (areaName !== 'local' || !changes[AUTO_COMPACT_STORAGE_KEY]) {
+        return;
+      }
+
+      autoCollapseChatKeys = normalizeAutoCollapseChatKeys(changes[AUTO_COMPACT_STORAGE_KEY].newValue);
+      lastAutoCompactSignature = '';
+      updateAutoCollapseAction();
+      schedulePanelRefresh();
+    });
   }
 
   function getArticleSourceNodes(article) {
@@ -1280,16 +1323,20 @@
     window.addEventListener('popstate', schedulePanelRefresh);
   }
 
-  function bootstrap() {
+  async function bootstrap() {
+    await initializeAutoCollapseStorage();
     injectStyles();
     ensurePanel();
     installObservers();
+    installStorageSyncListener();
     schedulePanelRefresh();
   }
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', bootstrap, { once: true });
+    document.addEventListener('DOMContentLoaded', () => {
+      void bootstrap();
+    }, { once: true });
   } else {
-    bootstrap();
+    void bootstrap();
   }
 })();
