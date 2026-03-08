@@ -59,10 +59,6 @@ In-page action menu:
 
 ![Thread Toolkit menu](./docs/thread-toolkit-menu.png)
 
-Toolbar popup:
-
-![Thread Toolkit popup](./docs/thread-toolkit-popup.png)
-
 ## Privacy
 
 - All processing happens locally in the browser.
@@ -78,7 +74,7 @@ The previous userscript remains available at [`chatgpt-thread-toolkit.user.js`](
 
 ## Store Submission Notes
 
-Chrome Web Store listing copy, permission justifications, and screenshot references live in [`docs/chrome-web-store.md`](./docs/chrome-web-store.md).
+Chrome Web Store listing copy and permission justifications live in [`docs/chrome-web-store.md`](./docs/chrome-web-store.md).
 
 ## Validation
 

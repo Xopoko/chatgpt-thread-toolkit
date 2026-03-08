@@ -46,9 +46,9 @@ Used so the content script can run on supported ChatGPT pages and inject the flo
 
 ## Screenshot assets
 
-- In-page action menu: `docs/thread-toolkit-menu.png`
-- Toolbar popup: `docs/thread-toolkit-popup.png`
+- Repository preview screenshot: `docs/thread-toolkit-menu.png`
+- Store-specific screenshots and promo tiles should be generated locally when preparing a submission package.
 
 ## Privacy policy
 
-Use `docs/extension-privacy.md` as the source text for the public privacy policy page.
+Use `docs/extension-privacy.md` as the source privacy policy text and host it in your preferred format when preparing a submission.
