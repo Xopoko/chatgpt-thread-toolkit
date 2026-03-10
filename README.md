@@ -31,6 +31,12 @@ Run the packaging script from the repository root:
 pwsh -File scripts/package-extension.ps1
 ```
 
+or on macOS/Linux:
+
+```bash
+bash scripts/package-extension.sh
+```
+
 The script creates a Chrome Web Store upload zip in `output/` with the extension payload at the zip root.
 
 ## Toolbar Popup
@@ -86,7 +92,7 @@ node --check extension/content.js
 node --check extension/popup.js
 ```
 
-and packages the extension zip in CI using [`scripts/package-extension.ps1`](./scripts/package-extension.ps1).
+and packages the extension zip using [`scripts/package-extension.ps1`](./scripts/package-extension.ps1) or [`scripts/package-extension.sh`](./scripts/package-extension.sh).
 
 ## License
 
